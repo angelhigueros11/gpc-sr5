@@ -286,7 +286,7 @@ r.glClear()
 
 scale_factor = (100, 100, 100)
 translate_factor = (150, 150, 0)
-r.load_model('object.obj', scale_factor, translate_factor)
+r.load_model('models/object.obj', scale_factor, translate_factor)
 
 # r.triangle(V3(10, 70), V3(50, 160), V3(70, 80))
 # r.triangle(V3(180, 50), V3(150, 1), V3(70, 180))
