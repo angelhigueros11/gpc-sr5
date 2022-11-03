@@ -49,3 +49,4 @@ class V3(object):
 
     def __repr__(self):
         return "V3(%s, %s, %s)" % (self.x, self.y, self.z)
+        

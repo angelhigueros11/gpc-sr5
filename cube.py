@@ -7,6 +7,7 @@ class Obj(object):
         self.tvertices = []
         self.faces = []
 
+
         for line in self.lines:
             try:
                 prefix, value = line.split(' ', 1)

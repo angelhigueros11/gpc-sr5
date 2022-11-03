@@ -87,6 +87,3 @@ class Texture(object):
 # load_model()
 # r.glFinish()
 
-
-
-

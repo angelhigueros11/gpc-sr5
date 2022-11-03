@@ -299,3 +299,4 @@ r.load_model('object.obj', scale_factor, translate_factor)
 
 
 r.glFinish()
+
