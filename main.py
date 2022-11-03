@@ -1,12 +1,11 @@
 # Graficas por computador
 # Angel Higueros - 20460
-# SR2
+# SR5
 
-from re import A
 import struct
 from cube import Obj
 from vector import *
-import random
+from textures import *
 
 # Métodos de escritura
 def char(c): 
@@ -21,22 +20,33 @@ def dword(d):
 def color(r, g, b):
     return bytes([b, g, r])
 
-def cross(v0, v1):
+def cross(v1, v2):
     return (
-        v0.y * v1.z - v0.z * v1.y,
-        v0.z * v1.x - v0.x * v1.z,
-        v0.x * v1.y - v0.y * v1.x,
+        v1.y * v2.z - v1.z * v2.y,
+        v1.z * v2.x - v1.x * v2.z,
+        v1.x * v2.y - v1.y * v2.x,
     )
 
 
-def bounding_box(*vertices):
+def bounding_box(A, B, C):
+    coords = [(A.x, A.y), (B.x, B.y), (C.x, C.y)]
 
-    xs = [ vertex.x for vertex in vertices ]
-    ys = [ vertex.y for vertex in vertices ]
-    xs.sort()
-    ys.sort()
+    xmin = 999999
+    xmax = -999999
+    ymin = 999999
+    ymax = -999999
 
-    return V3(xs[0], ys[0]), V3(xs[-1], ys[-1])
+    for (x, y) in coords:
+        if x < xmin:
+            xmin = x
+        if x > xmax:
+            xmax = x
+        if y < ymin:
+            ymin = y
+        if y > ymax:
+            ymax = y
+
+    return V3(xmin, ymin),  V3(xmax, ymax)
 
 
 def barycenter(a, b, c, p):
@@ -49,11 +59,11 @@ def barycenter(a, b, c, p):
     if abs(cz) < 1:
         return -1, -1, -1 
 
-    u = cx/cz
-    v = cy/cz
-    w = 1 - (u + v)
+    u = cx / cz
+    v = cy / cz
+    w = 1 - (cx + cy) / cz
 
-    return w, v, u
+    return (w, v, u)
 
 
 
@@ -63,68 +73,29 @@ class Render(object):
         self.filename = filename 
         self.width = 100 
         self.height = 100
-        self.viewport_x = 0 
-        self.viewport_y = 0 
-        self.viewport_width = 100 
-        self.viewport_height = 100
         self.current_color = color(255, 255, 255) # por defecto blanco
-        self.vertex_color = color(200, 0, 0) # por defecto rojo
         self.framebuffer = []
+        self.texture = None
         self.glClear()
 
     def glCreateWindow(self, width, height):
         self.width = width
         self.height = height
 
-    def glViewPort(self, x, y, width, height):
-
-        if self.width < x + width or self.height < y + height:
-            print("[!] El viewport debe estar dentro de las medidas de la pantalla")
-            self.viewport_x = 0
-            self.viewport_y = 0
-            self.viewport_width = self.width
-            self.viewport_height = self.height
-            self.glClear()
-        else:
-            self.viewport_x = x
-            self.viewport_y = y
-            self.viewport_width = width
-            self.viewport_height = height
-            self.glClear()
-
     def glClear(self):
-        self.framebuffer= [
+        self.framebuffer = [
             [color(0, 0, 0) for x in range(self.width)]
             for y in range(self.height)
         ]
 
-        self.zbuffer= [
+        self.zBuffer= [
             [-9999 for x in range(self.width)]
             for y in range(self.height)
         ]
 
-        for x in range(self.width):
-            for y in range(self.height):
-                if x >= self.viewport_x and x <= self.viewport_width and y >= self.viewport_y and y <= self.viewport_height:
-                    self.framebuffer[x][y] = self.current_color 
-
-    def glClearColor(self, r, g, b):
-        self.current_color = color(r, g, b)
-
-    def glVertex(self, x, y):
-
-        # convertir coordenadas normalizadas a cordenadas del dispositivo
-        half_size_width = self.viewport_width / 2
-        half_size_height = self.viewport_height / 2
-
-        coord_x = int((( x + 1 ) * half_size_width ))
-        coord_y = int((( y + 1 ) * half_size_height ))
-
-        self.framebuffer[coord_x][coord_y] = self.vertex_color
-
     def point(self, x, y):
         if 0 < x < self.width and 0 < y < self.height:
-            self.framebuffer[x][y] = self.vertex_color
+            self.framebuffer[x][y] = self.current_color
 
        
     def line(self, v1, v2):
@@ -147,24 +118,22 @@ class Render(object):
             y0, y1 = y1, y0 
 
         dy = abs(y1 - y0)
-        dx = abs(x1 - x0)
+        dx = x1 - x0
 
         offset = 0
         threshold = dx
         y =  y0
 
-        for x in range(x0, x1 + 1):
-
-            
+        for x in range(x0, x1 + 1):           
             if steep:
-                r.point(y, x)
+                self.point(x, y)
             else:
-                r.point(x, y)
+                self.point(y, x)
 
             # offset += (dy/dx) * dx * 2
             offset += dy * 2
 
-            if offset > threshold:
+            if offset >= threshold:
                 y += 1 if y0 < y1 else  -1
                 # threshold += 1 * dx * 2
                 threshold += dx * 2
@@ -185,11 +154,36 @@ class Render(object):
                 f2 = face[1][0] - 1
                 f3 = face[2][0] - 1
 
+  
                 v1 =  self.transform_vertex(obj.vertices[f1], scale_factor, translate_factor)
                 v2 =  self.transform_vertex(obj.vertices[f2], scale_factor, translate_factor)
                 v3 =  self.transform_vertex(obj.vertices[f3], scale_factor, translate_factor)
 
-                self.triangle(v1, v2, v3)
+                if self.texture:
+                    ft1 = face[0][1] - 1
+                    ft2 = face[1][1] - 1
+                    ft3 = face[2][1] - 1
+                    
+                    vt1 = V3(
+                        obj.tvertices[ft1][0],
+                        obj.tvertices[ft1][1],
+                        )
+                    vt2 = V3(
+                        obj.tvertices[ft2][0],
+                        obj.tvertices[ft2][1],
+                        )
+                    vt3 = V3(
+                        obj.tvertices[ft3][0],
+                        obj.tvertices[ft3][1],
+                        )
+                    
+                    self.triangle(
+                        (v1, v2, v3),
+                        (vt1, vt2, vt3)
+                    )
+                    
+                else:
+                    self.triangle((v1, v2, v3))
 
             if len(face) == 4:
                 f1 = face[0][0] - 1
@@ -207,8 +201,14 @@ class Render(object):
                 self.line(v3[0], v3[1], v1[0], v1[1])
                 self.line(v4[0], v4[1], v1[0], v1[1]) 
 
-    def triangle(self, a, b, c):
-        luz = V3(0, 0, -1)
+    def triangle(self, vertices, tvertices = ()):
+        a, b, c = vertices
+
+        if self.texture:
+            ta, tb, tc = tvertices
+
+
+        luz = V3(0, 0, 1)
         n = (b - a) * (c - a)
         i = n.norm() @ luz.norm()
 
@@ -230,20 +230,26 @@ class Render(object):
                     continue
                 
 
-                z = a.z * w + b.z * v * c.z * u
+                z = a.z * w + b.z * v + c.z * u
 
-                if (self.zbuffer[x][y] < z):
-                    self.zbuffer[x][y] = z
-                    self.point(x, y)
+                if (self.zBuffer[x][y] < z):
+                    self.zBuffer[x][y] = z
+
+                    if self.texture:
+                        tx = ta.x * w + tb.x + u + tc.x * v
+                        ty = ta.y * w + tb.y + u + tc.y * v
+
+                        self.current_color = self.texture.get_color_with_intensity(tx, ty, i)
+
+                        self.get_
+                    self.point(y, x)
 
 
        
         
 
     def glColor(self, r, g, b):
-        self.vertex_color = color(r, g, b)
-
-
+        self.current_color = color(r, g, b)
 
     def glFinish(self):
         f = open(self.filename, 'bw')
@@ -271,22 +277,21 @@ class Render(object):
         f.write(dword(0)) # resolucion
 
 
-        for x in range(self.height):
-            for y in range(self.width):
+        for y in range(self.height):
+            for x in range(self.width):
                 f.write(self.framebuffer[y][x])
 
 
 # IMPLEMENTACION
 r = Render()
-r.glInit('sr3-model.bmp')
-r.glCreateWindow(300, 300)
-r.glViewPort(0,0, 300, 300)
-r.glClearColor(0, 0, 0)
-r.glClear()
+r.glInit('sr5-textures.bmp')
+r.glCreateWindow(1050, 1000)
+r.glColor(0, 250, 250)
 
-scale_factor = (100, 100, 100)
-translate_factor = (150, 150, 0)
-r.load_model('models/object.obj', scale_factor, translate_factor)
+scale_factor = (400, 400, 500)
+translate_factor = (512, 512, 0)
+r.texture = Texture('./model.bmp')
+r.load_model('object.obj', scale_factor, translate_factor)
 
 # r.triangle(V3(10, 70), V3(50, 160), V3(70, 80))
 # r.triangle(V3(180, 50), V3(150, 1), V3(70, 180))
