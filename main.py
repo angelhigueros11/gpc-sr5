@@ -105,7 +105,7 @@ class Render(object):
         y = self.y_vertex + vertex_y
         
         self.framebuffer[
-            int(y)][int(x)
+            int(x)][int(y)
             ] = self.current_color
     
     def point(self, x, y):
@@ -184,9 +184,9 @@ class Render(object):
         f.write(dword(0))  # resolucion
         f.write(dword(0))  # resolucion
 
-        for y in range(self.height):
-            for x in range(self.width):
-                f.write(self.framebuffer[x][y])
+        for y in range(self.height-1, -1, -1):
+          for x in range(self.width):
+              f.write(self.framebuffer[x][y])
 
 
     def triangle(self, v1, v2, v3, cords, light):
