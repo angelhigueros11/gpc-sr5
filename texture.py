@@ -1,6 +1,9 @@
+# Graficas por computador
+# Angel Higueros - 20460
+# SR5
+
 import contextlib
 import struct
-from gl import *
 
 def color(b, g, r):
   return bytes([b, g, r])
